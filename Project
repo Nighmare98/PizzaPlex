@@ -1,0 +1,109 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Threading;
+
+namespace ConsoleApp1
+{
+    public class Pizza
+    {
+        public string Name { get; set; }
+    }
+
+    public class Warehouse
+    {
+        private Queue<Pizza> pizzas = new Queue<Pizza>();
+        private int capacity;
+
+        public Warehouse(int capacity)
+        {
+            this.capacity = capacity;
+        }
+
+        public void AddPizza(Pizza pizza)
+        {
+            lock (pizzas)
+            {
+                while (pizzas.Count >= capacity)
+                {
+                    Monitor.Wait(pizzas);
+                }
+                pizzas.Enqueue(pizza);
+                Monitor.PulseAll(pizzas);
+            }
+        }
+
+        public Pizza GetPizza()
+        {
+            lock (pizzas)
+            {
+                while (pizzas.Count == 0)
+                {
+                    Monitor.Wait(pizzas);
+                }
+                Pizza pizza = pizzas.Dequeue();
+                Monitor.PulseAll(pizzas);
+                return pizza;
+            }
+        }
+    }
+
+    public class Baker
+    {
+        private Warehouse warehouse;
+
+        public Baker(Warehouse warehouse)
+        {
+            this.warehouse = warehouse;
+        }
+
+        public void BakePizza(Pizza pizza)
+        {
+            Console.WriteLine($"Baker is baking pizza {pizza.Name}");
+            Thread.Sleep(1000);
+            Console.WriteLine($"Baker has baked pizza {pizza.Name}");
+            warehouse.AddPizza(pizza);
+        }
+    }
+
+    public class Courier
+    {
+        private Warehouse warehouse;
+
+        public Courier(Warehouse warehouse)
+        {
+            this.warehouse = warehouse;
+        }
+
+        public void DeliverPizza(Pizza pizza)
+        {
+            Console.WriteLine($"Courier is delivering pizza {pizza.Name}");
+            Thread.Sleep(1000);
+            Console.WriteLine($"Courier has delivered pizza {pizza.Name}");
+            warehouse.AddPizza(pizza);
+        }
+    }
+
+    public class Program
+    {
+        public static void Main()
+        {
+            Warehouse warehouse = new Warehouse(10);
+            Baker baker = new Baker(warehouse);
+            Courier courier = new Courier(warehouse);
+
+            Thread bakerThread = new Thread(() => baker.BakePizza(new Pizza { Name = "Margherita" }));
+            Thread courierThread = new Thread(() => courier.DeliverPizza(new Pizza { Name = "Margherita" }));
+
+
+            bakerThread.Start();
+            courierThread.Start();
+
+            bakerThread.Join();
+            courierThread.Join();
+            Console.ReadKey();
+        }
+    }
+}
